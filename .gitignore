@@ -1,0 +1,33 @@
+# Environment & Secret files
+*.env
+*.local.env
+**/secrets/
+*.token
+*.key
+*.pem
+id_ed25519*
+id_rsa*
+
+# Runtime logs and PIDs
+*.log
+logs/
+/tmp/
+*.pid
+
+# System and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*~
+
+# Node modules
+node_modules/
+npm-debug.log*
+
+# Python caches
+__pycache__/
+*.pyc
+.venv/
