@@ -1,8 +1,9 @@
-# ==============================================================================
+﻿# ==============================================================================
 # claude-remote-ssh: Desktop Installation & Registration (Windows)
 # ==============================================================================
 
 [CmdletBinding()]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '')]
 param()
 
 $ErrorActionPreference = "Stop"

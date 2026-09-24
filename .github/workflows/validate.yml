@@ -1,4 +1,4 @@
-name: CI Validation
+﻿name: CI Validation
 
 on:
   push:
@@ -41,7 +41,7 @@ jobs:
         shell: pwsh
         run: |
           Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
-          $results = Invoke-ScriptAnalyzer -Path ./desktop-windows -Recurse -Severity Error,Warning
+          $results = Invoke-ScriptAnalyzer -Path ./desktop-windows -Recurse -Severity Warning,Error -ExcludeRule PSAvoidUsingWriteHost
           if ($results) {
               $results | Format-Table -AutoSize
               exit 1

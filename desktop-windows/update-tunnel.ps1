@@ -21,7 +21,7 @@ try {
 }
 
 if ([string]::IsNullOrWhiteSpace($tunnelAddress) -or $tunnelAddress -eq "initial") {
-    Write-Host "[i] Gist mailbox is currently uninitialized. Waiting for server..."
+    Write-Output "[i] Gist mailbox is currently uninitialized. Waiting for server..."
     return
 }
 
@@ -68,7 +68,7 @@ $blockRegex = "(?ms)(^|\r?\n)Host\s+$([regex]::Escape($hostAlias))\s*(\r?\n(?:[ 
 if ($existingContent -match $blockRegex) {
     $currentBlock = $Matches[0]
     if ($currentBlock -match "HostName\s+$([regex]::Escape($newHost))" -and $currentBlock -match "Port\s+$newPort") {
-        Write-Host "[+] Tunnel configuration for '$hostAlias' is current ($newHost:$newPort)."
+        Write-Output "[+] Tunnel configuration for '$hostAlias' is current ($newHost:$newPort)."
         return
     }
 
@@ -78,4 +78,4 @@ if ($existingContent -match $blockRegex) {
 }
 
 [System.IO.File]::WriteAllText($configPath, $updatedContent, [System.Text.UTF8Encoding]::new($false))
-Write-Host "[+] SSH configuration updated: $hostAlias -> ${newHost}:${newPort}"
+Write-Output "[+] SSH configuration updated: $hostAlias -> ${newHost}:${newPort}"
