@@ -143,7 +143,6 @@ Distributed under the [MIT License](LICENSE).
 **Mohammad H. Amirkhani**
 
 - **GitHub**: [@MHAmirkhani](https://github.com/MHAmirkhani)
-- **Affiliation**: Iran University of Science and Technology (IUST)
 - **Website**: [Amirkhani.me](https://Amirkhani.me)
 - **Telegram**: [@IUseGentoo_BTW](https://t.me/IUseGentoo_BTW)
 - **Email**: Amirkhani.MohammadH@gmail.com
