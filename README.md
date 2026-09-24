@@ -1,6 +1,6 @@
-﻿# claude-remote-ssh
+# claude-remote-ssh
 
-> Bridge **Claude Desktop** to firewalled, NAT-restricted Linux servers â€” zero public IP, no port forwarding, and no dedicated VPS required.
+> Bridge **Claude Desktop** to firewalled, NAT-restricted Linux servers — zero public IP, no port forwarding, and no dedicated VPS required.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI Validation](https://github.com/MHAmirkhani/claude-remote-ssh/actions/workflows/validate.yml/badge.svg)](https://github.com/MHAmirkhani/claude-remote-ssh/actions)
@@ -22,41 +22,44 @@ In heavily filtered network environments (such as university labs or restricted 
 
 ## Architecture
 
+
 ```
-+--------------------------+                 +----------------------------+
-|  Restricted Linux VM     |   TCP / 443     |  Remote Proxy Server       |
-|  (Ubuntu Behind NAT)     | --------------> |  (VLESS / Trojan Provider) |
-+------------+-------------+                 +----------------------------+
-             |
-             | 1. Opens reverse TCP tunnel via Pinggy
-             |    (routed through local Xray SOCKS5 proxy on 127.0.0.1:10809)
-             v
+
++--------------------------+                  +----------------------------+
+|  Restricted Linux VM     |    TCP / 443     |  Remote Proxy Server       |
+|  (Ubuntu Behind NAT)     | ---------------> |  (VLESS / Trojan Provider) |
++------------+-------------+                  +----------------------------+
+|
+| 1. Opens reverse TCP tunnel via Pinggy
+|    (routed through local Xray SOCKS5 proxy on 127.0.0.1:10809)
+v
 +--------------------------+
 |  Pinggy Edge Server      |  Generates public endpoint:
 |  (Over TLS / Port 443)   |  tcp://xyz.pinggy-free.link:PORT
 +------------+-------------+
-             |
-             | 2. VM pushes ephemeral URL via GitHub REST API
-             v
+|
+| 2. VM pushes ephemeral URL via GitHub REST API
+v
 +--------------------------+
 |  GitHub Secret Gist      |  Mailbox: topo_tunnel.txt
 |  (Encrypted Relay)       |
 +------------+-------------+
-             |
-             | 3. Client polls Gist with cache-busting headers
-             v
+|
+| 3. Client polls Gist with cache-busting headers
+v
 +--------------------------+
 |  Desktop Workstation     |
 |  - update-tunnel.ps1     | Updates ~/.ssh/config non-destructively
 |  - Windows Task / Cron   | Synchronizes every 5 minutes
 |  - Claude Desktop (MCP)  | Executes tools through alias "topo-server"
 +------------+-------------+
-             |
-             | 4. End-to-End Encrypted SSH Session
-             v
+|
+| 4. End-to-End Encrypted SSH Session
+v
 +--------------------------+
 |  VM OpenSSH Daemon (22)  |
 +--------------------------+
+
 ```
 
 ---
@@ -65,10 +68,10 @@ In heavily filtered network environments (such as university labs or restricted 
 
 | Solution | UDP Blocked? | CGNAT / No Public IP? | Requires VPS? | Survives CDN Cache? |
 |---|:---:|:---:|:---:|:---:|
-| Direct SSH | âŒ Fails | âŒ Fails | N/A | N/A |
-| Tailscale / WireGuard | âŒ Fails | âŒ Blocked | âŒ Needs DERP | N/A |
-| Cloudflare Argo Tunnel | âš ï¸ Regional Bans | âœ… Yes | âŒ No | N/A |
-| **claude-remote-ssh** | **âœ… Works (TCP only)** | **âœ… Works** | **âœ… No VPS needed** | **âœ… Yes (Cache-busted)** |
+| Direct SSH | ❌ Fails | ❌ Fails | N/A | N/A |
+| Tailscale / WireGuard | ❌ Fails | ❌ Blocked | ⚠️ Needs DERP | N/A |
+| Cloudflare Argo Tunnel | ⚠️ Regional Bans | ✅ Yes | ❌ No | N/A |
+| **claude-remote-ssh** | **✅ Works (TCP only)** | **✅ Works** | **✅ No VPS needed** | **✅ Yes (Cache-busted)** |
 
 ---
 
@@ -94,55 +97,67 @@ Ensure you have:
 
 ### 2. Server Installation
 ```bash
-git clone https://github.com/MHAmirkhani/claude-remote-ssh.git
+git clone [https://github.com/MHAmirkhani/claude-remote-ssh.git](https://github.com/MHAmirkhani/claude-remote-ssh.git)
 cd claude-remote-ssh/server
 sudo bash setup-server.sh
+
 ```
 
 ### 3. Client Setup (Windows)
+
 Open PowerShell and run:
+
 ```powershell
 cd desktop-windows
 powershell -ExecutionPolicy Bypass -File .\setup-desktop.ps1
+
 ```
 
 ### 4. Claude Desktop Configuration
+
 1. Fully exit Claude Desktop from the system tray.
 2. Relaunch Claude Desktop.
 3. In conversation, prompt:
-   > "SSH into topo-server and show system status: `hostname; uptime; whoami`"
+> "SSH into topo-server and show system status: `hostname; uptime; whoami`"
+
+
 
 ---
 
 ## Documentation
 
-- [01 - Prerequisites](docs/01-prerequisites.md)
-- [02 - Server Setup](docs/02-server-setup.md)
-- [03 - Desktop Setup](docs/03-desktop-setup.md)
-- [04 - Claude MCP Configuration](docs/04-claude-mcp.md)
-- [05 - Troubleshooting Guide](docs/05-troubleshooting.md)
-- [06 - Deep Architecture](docs/06-architecture.md)
+* [01 - Prerequisites](https://www.google.com/search?q=docs/01-prerequisites.md&utm_source=gemini)
+* [02 - Server Setup](https://www.google.com/search?q=docs/02-server-setup.md&utm_source=gemini)
+* [03 - Desktop Setup](https://www.google.com/search?q=docs/03-desktop-setup.md&utm_source=gemini)
+* [04 - Claude MCP Configuration](https://www.google.com/search?q=docs/04-claude-mcp.md&utm_source=gemini)
+* [05 - Troubleshooting Guide](https://www.google.com/search?q=docs/05-troubleshooting.md&utm_source=gemini)
+* [06 - Deep Architecture](https://www.google.com/search?q=docs/06-architecture.md&utm_source=gemini)
 
 ---
 
 ## Security & Ethics
 
-- GitHub tokens are stored in strict `600` access credential files, never in public repositories.
-- Tunnel URLs only forward traffic to the VM's local SSH daemon; authentication remains protected by standard SSH asymmetric keys (`ed25519`).
-- Review [SECURITY.md](SECURITY.md) for full vulnerability reporting procedures.
+* GitHub tokens are stored in strict `600` access credential files, never in public repositories.
+* Tunnel URLs only forward traffic to the VM's local SSH daemon; authentication remains protected by standard SSH asymmetric keys (`ed25519`).
+* Review [SECURITY.md](SECURITY.md) for full vulnerability reporting procedures.
 
 ---
 
 ## License
 
-Distributed under the [MIT License](LICENSE).
+Distributed under the [MIT License](https://www.google.com/search?q=LICENSE&utm_source=gemini).
+
 ---
 
 ## Author
 
 **Mohammad H. Amirkhani**
 
-- **GitHub**: [@MHAmirkhani](https://github.com/MHAmirkhani)
-- **Website**: [Amirkhani.me](https://Amirkhani.me)
-- **Telegram**: [@IUseGentoo_BTW](https://t.me/IUseGentoo_BTW)
-- **Email**: Amirkhani.MohammadH@gmail.com
+* **GitHub**: [@MHAmirkhani](https://github.com/MHAmirkhani?utm_source=gemini)
+* **Website**: [Amirkhani.me](https://Amirkhani.me?utm_source=gemini)
+* **Telegram**: [@IUseGentoo_BTW](https://t.me/IUseGentoo_BTW?utm_source=gemini)
+* **Email**: Amirkhani.MohammadH@gmail.com
+
+```
+
+```
