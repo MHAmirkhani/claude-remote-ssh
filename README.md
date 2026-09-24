@@ -159,5 +159,3 @@ Distributed under the [MIT License](https://www.google.com/search?q=LICENSE&utm_
 * **Email**: Amirkhani.MohammadH@gmail.com
 
 ```
-
-```
