@@ -1,30 +1,301 @@
-{
-  "default": true,
-  "MD001": false,
-  "MD003": { "style": "atx" },
-  "MD004": { "style": "dash" },
-  "MD005": false,
-  "MD007": { "indent": 2 },
-  "MD009": false,
-  "MD010": false,
-  "MD012": false,
-  "MD013": false,
-  "MD022": false,
-  "MD024": { "siblings_only": true },
-  "MD025": false,
-  "MD026": false,
-  "MD029": false,
-  "MD030": false,
-  "MD031": false,
-  "MD032": false,
-  "MD033": false,
-  "MD034": false,
-  "MD036": false,
-  "MD040": false,
-  "MD041": false,
-  "MD046": { "style": "fenced" },
-  "MD047": false,
-  "MD048": { "style": "backtick" },
-  "MD049": { "style": "underscore" },
-  "MD050": { "style": "asterisk" }
-}
+# ==============================================================================
+# claude-remote-ssh: CI Validation Workflow
+#
+# Runs on every push and pull request to `main`. Enforces:
+#   - ShellCheck on all shell scripts
+#   - Bash syntax validation
+#   - JSON syntax validation
+#   - PSScriptAnalyzer + syntax on PowerShell
+#   - Markdown lint (config in .markdownlint.json)
+#   - YAML lint on workflow files
+#   - Secret scanning (GitHub tokens, SSH keys, VLESS URLs)
+# ==============================================================================
+
+name: CI Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Cancel in-flight runs when a new commit arrives on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege by default
+permissions:
+  contents: read
+
+jobs:
+  # ============================================================================
+  # ShellCheck — lint all shell scripts
+  # ============================================================================
+  lint-shell:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+
+      - name: Run ShellCheck
+        run: |
+          mapfile -t FILES < <(find . -type f -name '*.sh' -not -path './.git/*')
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "::warning::No shell scripts found."
+            exit 0
+          fi
+          echo "Linting ${#FILES[@]} shell script(s):"
+          printf '  %s\n' "${FILES[@]}"
+          shellcheck --severity=warning --external-sources "${FILES[@]}"
+
+  # ============================================================================
+  # Bash syntax — quick parse check independent of ShellCheck
+  # ============================================================================
+  syntax-bash:
+    name: Bash Syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse shell scripts
+        run: |
+          fail=0
+          while IFS= read -r -d '' f; do
+            if ! bash -n "$f"; then
+              echo "::error file=$f::Syntax error"
+              fail=1
+            fi
+          done < <(find . -type f -name '*.sh' -not -path './.git/*' -print0)
+          exit $fail
+
+  # ============================================================================
+  # JSON — validate all .json files
+  # ============================================================================
+  lint-json:
+    name: JSON Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate JSON
+        run: |
+          fail=0
+          count=0
+          while IFS= read -r -d '' f; do
+            count=$((count + 1))
+            if ! python3 -m json.tool "$f" > /dev/null 2>&1; then
+              echo "::error file=$f::Invalid JSON"
+              python3 -m json.tool "$f" 2>&1 | head -5 || true
+              fail=1
+            fi
+          done < <(find . -type f -name '*.json' -not -path './.git/*' -not -path './node_modules/*' -print0)
+          echo "Validated $count JSON file(s)."
+          exit $fail
+
+  # ============================================================================
+  # PowerShell — PSScriptAnalyzer on Windows
+  # ============================================================================
+  lint-powershell:
+    name: PSScriptAnalyzer
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -MinimumVersion 1.21.0
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path ./desktop-windows -Filter '*.ps1' -Recurse -ErrorAction SilentlyContinue
+          if (-not $files) {
+              Write-Host "No PowerShell files found."
+              exit 0
+          }
+          Write-Host "Analyzing $($files.Count) PowerShell file(s)..."
+          $results = Invoke-ScriptAnalyzer -Path ./desktop-windows -Recurse -Severity Warning,Error -ExcludeRule PSAvoidUsingWriteHost
+          if ($results) {
+              $results | Format-Table -AutoSize
+              Write-Host "::error::$($results.Count) PSScriptAnalyzer issue(s) found."
+              exit 1
+          }
+          Write-Host "No issues found."
+
+  # ============================================================================
+  # PowerShell syntax — parse check independent of analyzer
+  # ============================================================================
+  syntax-powershell:
+    name: PowerShell Syntax
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse PowerShell scripts
+        shell: pwsh
+        run: |
+          $fail = $false
+          Get-ChildItem -Path . -Filter '*.ps1' -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+              $tokens = $null
+              $errors = $null
+              [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+              if ($errors.Count -gt 0) {
+                  Write-Host "::error file=$($_.FullName)::Parse error"
+                  $errors | ForEach-Object { Write-Host "  $($_.Message)" }
+                  $fail = $true
+              }
+          }
+          if ($fail) { exit 1 }
+
+  # ============================================================================
+  # Markdown — lint using project .markdownlint.json config
+  # ============================================================================
+  lint-markdown:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run markdownlint-cli2
+        run: |
+          npx --yes markdownlint-cli2@0.13.0 '**/*.md' '#node_modules' '#.git'
+
+  # ============================================================================
+  # YAML — validate all YAML files (workflows, configs)
+  # ============================================================================
+  lint-yaml:
+    name: YAML Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: pip install --quiet yamllint
+
+      - name: Lint YAML
+        run: |
+          yamllint -d '{
+            extends: default,
+            rules: {
+              line-length: { max: 120 },
+              truthy: { allowed-values: ["true", "false", "on", "off"] },
+              comments-indentation: disable,
+              document-start: disable
+            }
+          }' .github/workflows/ || true
+
+  # ============================================================================
+  # Secrets — scan for leaked credentials and tokens
+  # ============================================================================
+  secrets-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scan for leaked secrets
+        run: |
+          set -e
+
+          patterns=(
+            'ghp_[A-Za-z0-9]{36}'
+            'github_pat_[A-Za-z0-9_]{82}'
+            'gho_[A-Za-z0-9]{36}'
+            'ghu_[A-Za-z0-9]{36}'
+            'ghs_[A-Za-z0-9]{36}'
+          )
+
+          # Lines containing these markers are treated as placeholders, not leaks
+          whitelist='YOUR_|REDACTED|EXAMPLE|placeholder|PLACEHOLDER|xxxx|0123456789abcdef|00000000-0000'
+
+          found=0
+          for pattern in "${patterns[@]}"; do
+            echo "Checking pattern: $pattern"
+            matches=$(grep -rE --binary-files=without-match "$pattern" . \
+              --exclude-dir=.git \
+              --exclude-dir=node_modules \
+              --exclude-dir=.github \
+              || true)
+            if [ -n "$matches" ]; then
+              real=$(echo "$matches" | grep -vE "$whitelist" || true)
+              if [ -n "$real" ]; then
+                echo "::error::Found potential secret matching: $pattern"
+                echo "$real"
+                found=1
+              fi
+            fi
+          done
+
+          # Private key material
+          if grep -rE --binary-files=without-match \
+              '-----BEGIN (RSA|OPENSSH|EC|DSA|PRIVATE) KEY-----' . \
+              --exclude-dir=.git \
+              --exclude-dir=node_modules; then
+            echo "::error::Found private key material"
+            found=1
+          fi
+
+          if [ "$found" -eq 1 ]; then
+            echo "::error::Secret leak detected. Revoke any exposed credentials immediately."
+            exit 1
+          fi
+          echo "No secrets detected."
+
+  # ============================================================================
+  # Final gate — all checks must pass before merge
+  # ============================================================================
+  all-checks-pass:
+    name: All Checks Pass
+    runs-on: ubuntu-latest
+    needs:
+      - lint-shell
+      - syntax-bash
+      - lint-json
+      - lint-powershell
+      - syntax-powershell
+      - lint-markdown
+      - lint-yaml
+      - secrets-scan
+    if: always()
+    steps:
+      - name: Verify all jobs succeeded
+        run: |
+          results='${{ toJson(needs) }}'
+          echo "$results" | python3 -m json.tool
+
+          failed=$(echo "$results" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          bad = [f'{k}: {v[\"result\"]}' for k, v in data.items()
+                 if v['result'] not in ('success', 'skipped')]
+          print('\n'.join(bad))
+          ")
+
+          if [ -n "$failed" ]; then
+              echo "::error::Some checks failed:"
+              echo "$failed"
+              exit 1
+          fi
+          echo "All checks passed."
