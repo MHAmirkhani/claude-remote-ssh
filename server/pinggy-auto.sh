@@ -3,6 +3,12 @@
 # Pinggy Auto-Tunnel & Resilient Watchdog Daemon
 # Manages SSH reverse tunnel through Xray SOCKS5 proxy and synchronizes
 # the ephemeral URL to a private GitHub Gist mailbox.
+#
+# Features:
+#   - Process liveness check (kill -0)
+#   - DNS health check (detects stale tunnels that zombie processes hide)
+#   - 58-minute rotation for Pinggy free tier
+#   - Graceful shutdown via trap
 # ==============================================================================
 
 set -uo pipefail
@@ -20,6 +26,11 @@ SOCKS_PROXY="${SOCKS_PROXY:-127.0.0.1:10809}"
 
 LOG_FILE="/tmp/pinggy_output.log"
 PID_FILE="/tmp/pinggy_tunnel.pid"
+URL_FILE="/tmp/pinggy_url.txt"
+
+# Health check interval and rotation interval (seconds)
+HEALTH_CHECK_INTERVAL=90
+ROTATION_INTERVAL=3480   # 58 minutes
 
 if [[ -z "$GITHUB_TOKEN" || -z "$GIST_ID" ]]; then
     echo "[$(date -u)] [x] Missing mandatory GITHUB_TOKEN or GIST_ID environment variables." >&2
@@ -60,6 +71,7 @@ stop_tunnel() {
         fi
         rm -f "$PID_FILE"
     fi
+    rm -f "$URL_FILE"
 }
 
 cleanup() {
@@ -101,6 +113,7 @@ start_tunnel() {
     done
 
     if [[ -n "$parsed_url" ]]; then
+        echo "$parsed_url" > "$URL_FILE"
         publish_url "$parsed_url"
         return 0
     fi
@@ -110,33 +123,70 @@ start_tunnel() {
     return 1
 }
 
+# --- Health Check ---
+# Returns 0 if tunnel URL is resolvable, 1 otherwise.
+health_check() {
+    if [[ ! -f "$URL_FILE" ]]; then
+        return 1
+    fi
+
+    local url host
+    url=$(cat "$URL_FILE" 2>/dev/null || true)
+    [[ -z "$url" ]] && return 1
+
+    host=$(echo "$url" | sed 's|tcp://||' | cut -d: -f1)
+
+    if getent hosts "$host" > /dev/null 2>&1; then
+        return 0
+    fi
+
+    echo "[$(date -u)] [!] Health check FAILED — DNS for '$host' does not resolve."
+    return 1
+}
+
 # --- Main Supervisor Loop ---
 START_TIME=$(date +%s)
 start_tunnel || true
 
+LAST_HEALTH_CHECK=$(date +%s)
+
 while true; do
     sleep 30
 
-    # Liveness check on process ID
+    # --- Liveness check ---
     if [[ -f "$PID_FILE" ]]; then
         PID=$(cat "$PID_FILE" 2>/dev/null || true)
         if [[ -z "$PID" ]] || ! kill -0 "$PID" 2>/dev/null; then
             echo "[$(date -u)] [!] Tunnel process died. Restarting immediately..."
             start_tunnel || true
             START_TIME=$(date +%s)
+            LAST_HEALTH_CHECK=$(date +%s)
             continue
         fi
     else
         start_tunnel || true
         START_TIME=$(date +%s)
+        LAST_HEALTH_CHECK=$(date +%s)
         continue
     fi
 
-    # Rotation interval: Restart every 58 minutes (3480 seconds) for Pinggy free tier
+    # --- DNS health check (every HEALTH_CHECK_INTERVAL seconds) ---
     NOW=$(date +%s)
-    if (( NOW - START_TIME >= 3480 )); then
+    if (( NOW - LAST_HEALTH_CHECK >= HEALTH_CHECK_INTERVAL )); then
+        LAST_HEALTH_CHECK=$NOW
+        if ! health_check; then
+            echo "[$(date -u)] [!] Tunnel is unhealthy (stale DNS). Restarting..."
+            start_tunnel || true
+            START_TIME=$(date +%s)
+            continue
+        fi
+    fi
+
+    # --- Rotation (every ROTATION_INTERVAL seconds) ---
+    if (( NOW - START_TIME >= ROTATION_INTERVAL )); then
         echo "[$(date -u)] [i] 58-minute rotation limit reached. Refreshing tunnel..."
         start_tunnel || true
         START_TIME=$(date +%s)
+        LAST_HEALTH_CHECK=$(date +%s)
     fi
 done
