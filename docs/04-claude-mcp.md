@@ -449,4 +449,3 @@ rm -rf ~/.npm/_npx
 ## Next Steps
 
 ➡️ **[05 — Troubleshooting](05-troubleshooting.md)**
-```
