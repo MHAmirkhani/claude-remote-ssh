@@ -261,4 +261,3 @@ Once every checkbox above is ticked, proceed to:
 | Testing the proxy only on the desktop | Test it from a network as close to the server as possible |
 | Forgetting to enable Developer Mode | MCP won't appear without it |
 | Using an old Node.js | MCP servers need Node 20+ — install fresh |
-```
