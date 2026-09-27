@@ -1,33 +1,325 @@
-# Environment & Secret files
+# ==============================================================================
+# claude-remote-ssh — Git Ignore Rules
+#
+# The goal is to never commit:
+#   - Credentials (GitHub tokens, SSH keys, proxy URLs)
+#   - Runtime state (logs, PID files, cached tunnel URLs)
+#   - Editor / OS noise
+#   - Build artifacts
+#
+# Templates and placeholder configs ARE tracked. Real configs with secrets
+# are NOT. When in doubt, prefer ignoring.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Secrets & Credentials
+# ------------------------------------------------------------------------------
+# Server-side runtime
+tunnel.env
 *.env
-*.local.env
-**/secrets/
-*.token
-*.key
-*.pem
+!*.env.example
+!env.example
+
+# Any file with "secret" or "credential" in the name
+*secret*
+*credential*
+!SECURITY.md
+!docs/**/secret*.md
+
+# SSH keys (never commit, even test ones)
 id_ed25519*
 id_rsa*
+id_ecdsa*
+id_dsa*
+*.pem
+*.key
+*.ppk
 
-# Runtime logs and PIDs
+# GitHub tokens (in case anyone saves them to a text file)
+*.token
+*.pat
+
+# Local overrides that may contain real hostnames / IPs / tokens
+*.local
+*.local.*
+*.private
+*.private.*
+
+# Explicit ignore for common leak paths
+**/secrets/
+**/private/
+**/.secrets/
+**/.private/
+
+# ------------------------------------------------------------------------------
+# Runtime State (created by the pipeline at runtime)
+# ------------------------------------------------------------------------------
+# Server-side
+/tmp/
+tmp/
+*.pid
+pinggy_*.log
+pinggy_*.txt
+pinggy_*.pid
+xray.log
+xray-access.log
+xray-error.log
+
+# Xray config backups created by update-xray.sh
+backups/
+*.bak
+*.backup
+
+# Local test configs with real values
+config.local.json
+claude_desktop_config.local.json
+xray-config.local.json
+
+# Desktop-side runtime directory
+.claude-remote-ssh/
+**/.claude-remote-ssh/
+
+# SSH config that may contain real hosts (for local testing)
+test-ssh-config
+*.sshconfig
+sshconfig.local
+
+# ------------------------------------------------------------------------------
+# Logs
+# ------------------------------------------------------------------------------
 *.log
 logs/
-/tmp/
-*.pid
+**/logs/
+!docs/**/*.md
 
-# System and editor files
+# Specific log patterns
+*.access.log
+*.error.log
+*.debug.log
+
+# ------------------------------------------------------------------------------
+# Operating System
+# ------------------------------------------------------------------------------
+# macOS
 .DS_Store
-Thumbs.db
-Desktop.ini
-.idea/
-.vscode/
-*.swp
-*~
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+*.icloud
 
-# Node modules
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+*.stackdump
+
+# Linux
+.directory
+.Trash-*
+.nfs*
+
+# ------------------------------------------------------------------------------
+# Editors & IDEs
+# ------------------------------------------------------------------------------
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.code-workspace
+
+# JetBrains (IntelliJ, PyCharm, WebStorm, etc.)
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Vim / Neovim
+*.swp
+*.swo
+*.swn
+*~
+.*.sw?
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+.\#*
+*.elc
+auto-save-list
+
+# Sublime
+*.sublime-project
+*.sublime-workspace
+
+# nano
+*.save
+.nano/
+
+# ------------------------------------------------------------------------------
+# Node.js
+# ------------------------------------------------------------------------------
 node_modules/
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.yarn/
+.pnp.*
+.pnp.js
 
-# Python caches
+# Test coverage
+coverage/
+.nyc_output/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# ------------------------------------------------------------------------------
+# Python
+# ------------------------------------------------------------------------------
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 .venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Testing
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ------------------------------------------------------------------------------
+# Shell / Bash
+# ------------------------------------------------------------------------------
+bash_history
+.bash_history
+.zsh_history
+.sh_history
+.history
+.history/
+
+# ------------------------------------------------------------------------------
+# Docker
+# ------------------------------------------------------------------------------
+.docker/
+docker-compose.override.yml
+
+# ------------------------------------------------------------------------------
+# Terraform / Ansible (in case someone adds IaC)
+# ------------------------------------------------------------------------------
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.retry
+ansible/*.vault
+ansible/*.vault.yml
+
+# ------------------------------------------------------------------------------
+# Miscellaneous
+# ------------------------------------------------------------------------------
+# Cache
+.cache/
+*.cache
+
+# Backup files
+*.orig
+*.rej
+*.bak
+
+# Lock files (from editors)
+*.lock
+!.gitignore
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Archives (usually shouldn't be committed)
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+
+# ------------------------------------------------------------------------------
+# Explicit exceptions — keep these tracked
+# ------------------------------------------------------------------------------
+# Documentation templates
+!docs/**/*.md
+!README.md
+!CHANGELOG.md
+!CONTRIBUTING.md
+!SECURITY.md
+!LICENSE
+
+# Source templates with placeholders (safe to commit)
+!server/xray-config.json
+!desktop-windows/claude_desktop_config.json
+!server/pinggy-auto.sh
+!server/setup-server.sh
+!server/update-xray.sh
+!server/check-tunnel.sh
+
+# Example configurations
+!*.example
+!*.sample
+!*.template
+!env.example
+
+# GitHub workflow & config
+!.github/
+!.github/**
+!.gitignore
+!.gitattributes
