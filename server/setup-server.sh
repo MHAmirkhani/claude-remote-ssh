@@ -2,6 +2,12 @@
 # ==============================================================================
 # claude-remote-ssh: Server Provisioning Script
 # Supported Platforms: Ubuntu 20.04, 22.04, 24.04 LTS
+#
+# Installs:
+#   - Xray-core proxy
+#   - pinggy-auto watchdog service
+#   - update-xray.sh helper
+#   - check-tunnel.sh helper
 # ==============================================================================
 
 set -euo pipefail
@@ -28,6 +34,7 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# Determine target user and home directory
 TARGET_USER="${SUDO_USER:-$(id -un)}"
 USER_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
 
@@ -38,7 +45,9 @@ fi
 
 info "Configuring service for user: $TARGET_USER ($USER_HOME)"
 
+# ------------------------------------------------------------------------------
 # Interactive configuration prompts
+# ------------------------------------------------------------------------------
 read -r -p "Enter GitHub Token (classic, 'gist' scope only): " GITHUB_TOKEN
 read -r -p "Enter GitHub Gist ID: " GIST_ID
 read -r -p "Enter Gist target filename [default: topo_tunnel.txt]: " GIST_FILENAME
@@ -49,12 +58,20 @@ if [[ -z "$GITHUB_TOKEN" || -z "$GIST_ID" ]]; then
     exit 1
 fi
 
+# Determine script directory (for locating helper files)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+info "Script directory: $SCRIPT_DIR"
+
+# ------------------------------------------------------------------------------
 # Step 1: Install Dependencies
+# ------------------------------------------------------------------------------
 log "Installing operating system dependencies..."
 apt-get update -qq
 apt-get install -y -qq curl wget unzip netcat-openbsd openssh-server jq ca-certificates
 
+# ------------------------------------------------------------------------------
 # Step 2: Install Xray Core
+# ------------------------------------------------------------------------------
 XRAY_VERSION="v25.9.11"
 XRAY_BIN="/usr/local/bin/xray"
 
@@ -72,11 +89,18 @@ else
     log "Xray installed successfully: $(/usr/local/bin/xray version | head -n 1)"
 fi
 
+# ------------------------------------------------------------------------------
 # Step 3: Template Configuration for Xray
+# ------------------------------------------------------------------------------
 mkdir -p /usr/local/etc/xray
+
 if [[ ! -f /usr/local/etc/xray/config.json ]]; then
     log "Generating default template at /usr/local/etc/xray/config.json"
-    cp xray-config.json /usr/local/etc/xray/config.json 2>/dev/null || cat > /usr/local/etc/xray/config.json <<'XRAY_CONF'
+
+    if [[ -f "${SCRIPT_DIR}/xray-config.json" ]]; then
+        cp "${SCRIPT_DIR}/xray-config.json" /usr/local/etc/xray/config.json
+    else
+        cat > /usr/local/etc/xray/config.json <<'XRAY_CONF'
 {
   "log": { "loglevel": "warning" },
   "inbounds": [
@@ -119,7 +143,8 @@ if [[ ! -f /usr/local/etc/xray/config.json ]]; then
             }
           }
         }
-      }
+      },
+      "mux": { "enabled": false }
     },
     { "tag": "direct", "protocol": "freedom" },
     { "tag": "block", "protocol": "blackhole" }
@@ -133,10 +158,15 @@ if [[ ! -f /usr/local/etc/xray/config.json ]]; then
   }
 }
 XRAY_CONF
+    fi
+
     warn "ACTION REQUIRED: Edit /usr/local/etc/xray/config.json with your actual VLESS node credentials."
+    warn "You can also use: sudo update-xray.sh \"vless://...\" (after setup completes)."
 fi
 
+# ------------------------------------------------------------------------------
 # Step 4: Setup Xray Systemd Service
+# ------------------------------------------------------------------------------
 log "Configuring systemd service for Xray..."
 cat > /etc/systemd/system/xray.service <<'SERVICE_CONF'
 [Unit]
@@ -164,7 +194,10 @@ systemctl daemon-reload
 systemctl enable xray.service
 systemctl restart xray.service
 
+# ------------------------------------------------------------------------------
 # Step 5: Secure Credential Environment File
+# ------------------------------------------------------------------------------
+log "Writing credential environment file..."
 mkdir -p /etc/claude-remote-ssh
 cat > /etc/claude-remote-ssh/tunnel.env <<ENV_CONF
 GITHUB_TOKEN=${GITHUB_TOKEN}
@@ -175,12 +208,49 @@ ENV_CONF
 chmod 600 /etc/claude-remote-ssh/tunnel.env
 chown -R "$TARGET_USER:$TARGET_USER" /etc/claude-remote-ssh
 
+# ------------------------------------------------------------------------------
 # Step 6: Install pinggy-auto watchdog runner
+# ------------------------------------------------------------------------------
 log "Deploying /usr/local/bin/pinggy-auto.sh..."
-cp pinggy-auto.sh /usr/local/bin/pinggy-auto.sh
-chmod 755 /usr/local/bin/pinggy-auto.sh
+if [[ -f "${SCRIPT_DIR}/pinggy-auto.sh" ]]; then
+    install -m 755 "${SCRIPT_DIR}/pinggy-auto.sh" /usr/local/bin/pinggy-auto.sh
+    info "Installed: /usr/local/bin/pinggy-auto.sh"
+else
+    err "pinggy-auto.sh not found in ${SCRIPT_DIR}. Aborting."
+    exit 1
+fi
 
+# ------------------------------------------------------------------------------
+# Step 6b: Install update-xray.sh and check-tunnel.sh helpers
+# ------------------------------------------------------------------------------
+log "Installing helper scripts..."
+
+if [[ -f "${SCRIPT_DIR}/update-xray.sh" ]]; then
+    install -m 755 "${SCRIPT_DIR}/update-xray.sh" /usr/local/bin/update-xray.sh
+    info "Installed: /usr/local/bin/update-xray.sh"
+else
+    warn "update-xray.sh not found in ${SCRIPT_DIR} — skipping"
+fi
+
+if [[ -f "${SCRIPT_DIR}/check-tunnel.sh" ]]; then
+    install -m 755 "${SCRIPT_DIR}/check-tunnel.sh" /usr/local/bin/check-tunnel.sh
+    info "Installed: /usr/local/bin/check-tunnel.sh"
+else
+    warn "check-tunnel.sh not found in ${SCRIPT_DIR} — skipping"
+fi
+
+# Create a system-wide alias for `check-tunnel`
+log "Creating 'check-tunnel' shell alias..."
+cat > /etc/profile.d/claude-remote-ssh.sh <<'PROFILE'
+# Aliases for claude-remote-ssh helper scripts
+alias check-tunnel="sudo /usr/local/bin/check-tunnel.sh"
+PROFILE
+chmod 644 /etc/profile.d/claude-remote-ssh.sh
+
+# ------------------------------------------------------------------------------
 # Step 7: Setup SSH directory and keys
+# ------------------------------------------------------------------------------
+log "Setting up SSH directory for $TARGET_USER..."
 SSH_DIR="${USER_HOME}/.ssh"
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR"
@@ -188,7 +258,16 @@ touch "${SSH_DIR}/authorized_keys"
 chmod 600 "${SSH_DIR}/authorized_keys"
 chown -R "${TARGET_USER}:${TARGET_USER}" "$SSH_DIR"
 
+# Generate an Ed25519 keypair if none exists (for the server side, useful for
+# diagnostics)
+if [[ ! -f "${SSH_DIR}/id_ed25519" ]]; then
+    log "Generating Ed25519 keypair for ${TARGET_USER}..."
+    sudo -u "$TARGET_USER" ssh-keygen -t ed25519 -f "${SSH_DIR}/id_ed25519" -N "" -q
+fi
+
+# ------------------------------------------------------------------------------
 # Step 8: Configure Pinggy Tunnel Service
+# ------------------------------------------------------------------------------
 log "Installing pinggy-tunnel.service..."
 cat > /etc/systemd/system/pinggy-tunnel.service <<SERVICE_PINGGY
 [Unit]
@@ -214,15 +293,37 @@ systemctl daemon-reload
 systemctl enable pinggy-tunnel.service
 systemctl restart pinggy-tunnel.service
 
+# ------------------------------------------------------------------------------
+# Final summary
+# ------------------------------------------------------------------------------
 echo ""
 echo "======================================================"
 log "Server deployment completed successfully!"
 echo "======================================================"
-echo "Status Commands:"
+echo ""
+echo "Status commands:"
 echo "  sudo systemctl status xray"
 echo "  sudo systemctl status pinggy-tunnel"
 echo "  sudo journalctl -u pinggy-tunnel -f"
 echo ""
-echo "Verify that your client desktop public key is added to:"
-echo "  ${SSH_DIR}/authorized_keys"
+echo "Helper commands (after re-login or 'source /etc/profile.d/claude-remote-ssh.sh'):"
+echo "  check-tunnel                        Full chain health check"
+echo "  sudo update-xray.sh \"vless://...\"   Replace Xray config with new VLESS URL"
+echo ""
+echo "Next steps:"
+echo "  1. If not done: configure Xray with real VLESS credentials"
+echo "       sudo update-xray.sh \"vless://YOUR_UUID@host:port?params#name\""
+echo "     OR edit manually:"
+echo "       sudo nano /usr/local/etc/xray/config.json"
+echo "       sudo systemctl restart xray"
+echo ""
+echo "  2. Verify the full chain:"
+echo "       check-tunnel"
+echo ""
+echo "  3. Add your desktop's public SSH key to:"
+echo "       ${SSH_DIR}/authorized_keys"
+echo "     From the desktop, run:"
+echo "       type \$env:USERPROFILE\\.ssh\\id_ed25519.pub | ssh -p PORT user@HOST \"cat >> ~/.ssh/authorized_keys\""
+echo ""
+echo "  4. On the desktop, follow docs/03-desktop-setup.md"
 echo "======================================================"
