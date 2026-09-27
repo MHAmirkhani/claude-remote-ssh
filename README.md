@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI Validation](https://github.com/MHAmirkhani/claude-remote-ssh/actions/workflows/validate.yml/badge.svg)](https://github.com/MHAmirkhani/claude-remote-ssh/actions)
 [![Claude MCP](https://img.shields.io/badge/MCP-Compatible-purple.svg)](https://modelcontextprotocol.io/)
-[![M8ven Score](https://m8ven.ai/badge/mcp/mhamirkhani/claude-remote-ssh)](https://m8ven.ai/mcp/mhamirkhani/claude-remote-ssh)
+[![M8ven Score](https://m8ven.ai/badge/mcp/mhamirkhani-claude-remote-ssh-1xg7bg?v=6cfc92a64fbf824f1e67e94f85308b8c)](https://m8ven.ai/mcp/mhamirkhani-claude-remote-ssh-1xg7bg)
 
 ---
 
