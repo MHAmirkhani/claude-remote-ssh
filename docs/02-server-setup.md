@@ -57,8 +57,8 @@ The script will prompt for three values:
 
 | Prompt | Example | Where to get it |
 |---|---|---|
-| **GitHub Token** | `ghp_xxxxxxxx...` | [docs/01-prerequisites.md](01-prerequisites.md#3b-a-personal-access-token-classic) |
-| **Gist ID** | `051d822078a8681de42c8a1c38d25fcb` | From the Gist URL |
+| **GitHub Token** | `ghp_YOUR_TOKEN` | [docs/01-prerequisites.md](01-prerequisites.md#3b-a-personal-access-token-classic) |
+| **Gist ID** | `0123456789abcdef0123456789abcdef` | From the Gist URL |
 | **Gist filename** | `topo_tunnel.txt` (default) | Press Enter to accept |
 
 The installer will:
@@ -114,7 +114,7 @@ Expected output:
 
 ```
 [+] Parsing VLESS URL...
-[i]   UUID: 26d2a41c-ea39-4bd7-bfdf-8c9f2b6a03c6
+[i]   UUID: 00000000-0000-0000-0000-000000000000
 [i]   Host: fr.example.com
 [i]   Port: 443
 [+]   Encryption: none
@@ -146,7 +146,7 @@ Replace these placeholders:
 | Placeholder | Replace with |
 |---|---|
 | `YOUR_PROVIDER_HOST` | e.g. `fr.example.com` |
-| `YOUR_UUID_HERE` | e.g. `26d2a41c-ea39-4bd7-bfdf-8c9f2b6a03c6` |
+| `YOUR_UUID_HERE` | e.g. `00000000-0000-0000-0000-000000000000` |
 | `YOUR_SNI_HOST` | e.g. `www.rust-lang.org` |
 | `"encryption": "none"` | The `encryption` value from your URL (or `none`) |
 
