@@ -397,7 +397,3 @@ sudo rm -f  /etc/profile.d/claude-remote-ssh.sh
 | Tunnel URL is stale in Gist | Watchdog crashed | `sudo systemctl restart pinggy-tunnel` |
 
 For deeper diagnostics, see [docs/05-troubleshooting.md](05-troubleshooting.md).
-```
----
-
-**تمومه. فایل بعدی رو بفرست:** `docs/03-desktop-setup.md`
