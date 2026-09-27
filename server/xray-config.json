@@ -11,6 +11,11 @@
       "settings": {
         "auth": "noauth",
         "udp": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"],
+        "routeOnly": false
       }
     }
   ],
@@ -40,9 +45,18 @@
           "header": {
             "type": "http",
             "request": {
+              "version": "1.1",
+              "method": "GET",
               "path": ["/"],
               "headers": {
-                "Host": ["YOUR_SNI_HOST"]
+                "Host": ["YOUR_SNI_HOST"],
+                "User-Agent": [
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                ],
+                "Accept": ["*/*"],
+                "Accept-Language": ["en-US,en;q=0.9"],
+                "Accept-Encoding": ["gzip, deflate, br"],
+                "Connection": ["keep-alive"]
               }
             }
           }
@@ -54,11 +68,13 @@
     },
     {
       "tag": "direct",
-      "protocol": "freedom"
+      "protocol": "freedom",
+      "settings": {}
     },
     {
       "tag": "block",
-      "protocol": "blackhole"
+      "protocol": "blackhole",
+      "settings": {}
     }
   ],
   "routing": {
@@ -73,7 +89,27 @@
         "type": "field",
         "outboundTag": "direct",
         "ip": ["geoip:private"]
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "domain": ["geosite:private"]
       }
     ]
-  }
+  },
+  "policy": {
+    "levels": {
+      "0": {
+        "handshake": 4,
+        "connIdle": 300,
+        "uplinkOnly": 2,
+        "downlinkOnly": 5
+      }
+    },
+    "system": {
+      "statsInboundUplink": false,
+      "statsInboundDownlink": false
+    }
+  },
+  "stats": {}
 }
