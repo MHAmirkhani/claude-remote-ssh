@@ -25,6 +25,6 @@
   "MD046": { "style": "fenced" },
   "MD047": false,
   "MD048": { "style": "backtick" },
-  "MD049": { "style": "underscore" },
+  "MD049": { "style": "asterisk" },
   "MD050": { "style": "asterisk" }
 }
