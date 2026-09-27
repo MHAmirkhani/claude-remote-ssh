@@ -1,23 +1,3 @@
-خوب، این README خیلی خوبه ولی چند تا مشکل داره که باید fix کنیم:
-
-## 🔍 مشکلات شناسایی‌شده
-
-1. **لینک‌های خراب:** همه‌ی لینک‌های docs به `google.com/search?q=...` اشاره می‌کنن — این‌ها احتمالاً از یه AI دیگه‌ای اومدن و کار نمی‌کنن.
-2. **نصب Unix client ذکر نشده** — فقط Windows توضیح داده شده.
-3. **Architecture diagram ناقص** — خطوط به‌هم‌ریخته.
-4. **بدون "How it works" section** — خواننده نمی‌فهمه چرا این معماری اینطوریه.
-5. **بدون مثال Claude prompt** — کاربر نمی‌دونه بعد از نصب چیکار کنه.
-6. **بدون Troubleshooting quick** — اگه خطا داد، کجا بره.
-7. **بدون "Uninstall"** — کسی که بخواد پاک کنه.
-8. **M8ven badge** — اگه خودت اضافه نکردی، باید حذف بشه.
-9. **بدون "Acknowledgments"** — برای پروژه‌هایی که ازشون استفاده کردیم.
-10. **بدون star history / contributing** — برای پروژه‌ی open-source خوبه.
-
----
-
-## 📄 FILE: `README.md` (نسخه‌ی نهایی)
-
-```markdown
 # claude-remote-ssh
 
 > Bridge **Claude Desktop** to firewalled, NAT-restricted Linux servers — zero public IP, no port forwarding, no VPS required.
