@@ -441,4 +441,3 @@ For deeper diagnostics, see [docs/05-troubleshooting.md](05-troubleshooting.md).
 ## Next Steps
 
 ➡️ **[04 — Claude MCP](04-claude-mcp.md)**
-```
