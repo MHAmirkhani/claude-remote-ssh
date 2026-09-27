@@ -300,4 +300,3 @@ Distributed under the [MIT License](LICENSE). Use freely, modify, share.
 - Website: [amirkhani.me](https://amirkhani.me)
 - Telegram: [@IUseGentoo_BTW](https://t.me/IUseGentoo_BTW)
 - Email: Amirkhani.MohammadH@gmail.com
-```
