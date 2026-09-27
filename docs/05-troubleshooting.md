@@ -577,7 +577,7 @@ If you accidentally committed `tunnel.env` or `claude_desktop_config.json` conta
 Verify your GitHub token has **only** `gist` scope:
 
 ```bash
-curl -sI -H "Authorization: token ghp_xxx" https://api.github.com/user \
+curl -sI -H "Authorization: token ghp_REDACTED" https://api.github.com/user \
   | grep -i "x-oauth-scopes"
 ```
 
