@@ -68,7 +68,7 @@ $blockRegex = "(?ms)(^|\r?\n)Host\s+$([regex]::Escape($hostAlias))\s*(\r?\n(?:[ 
 if ($existingContent -match $blockRegex) {
     $currentBlock = $Matches[0]
     if ($currentBlock -match "HostName\s+$([regex]::Escape($newHost))" -and $currentBlock -match "Port\s+$newPort") {
-        Write-Output "[+] Tunnel configuration for '$hostAlias' is current ($newHost:$newPort)."
+        Write-Output "[+] Tunnel configuration for '$hostAlias' is current (${newHost}:${newPort})."
         return
     }
 
