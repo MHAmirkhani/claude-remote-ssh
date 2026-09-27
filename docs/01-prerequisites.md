@@ -115,7 +115,7 @@ This is the file the server writes the tunnel URL to, and the desktop reads from
 5. After saving, look at the URL in your browser:
 
    ```
-   https://gist.github.com/YOUR_USERNAME/051d822078a8681de42c8a1c38d25fcb
+   https://gist.github.com/YOUR_USERNAME/0123456789abcdef0123456789abcdef
                                         └─────────── Gist ID ───────────┘
    ```
 
@@ -143,7 +143,7 @@ This allows the server to update the Gist automatically.
 5. **Copy the token immediately** — GitHub never shows it again. It looks like:
 
    ```
-   ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   ghp_YOUR_TOKEN_HERE
    ```
 
 > 🔒 **Security:**
