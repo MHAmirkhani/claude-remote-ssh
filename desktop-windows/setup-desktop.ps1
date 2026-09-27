@@ -1,5 +1,6 @@
-﻿# ==============================================================================
+# ==============================================================================
 # claude-remote-ssh: Desktop Installation & Registration (Windows)
+# Compatible with Windows PowerShell 5.1+ and PowerShell 7+
 # ==============================================================================
 
 [CmdletBinding()]
@@ -14,18 +15,20 @@ Write-Host "  Desktop Client Setup: claude-remote-ssh (Windows)   " -ForegroundC
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Verify prerequisites
+# --- Prerequisite Check ---
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 $npxCmd = Get-Command npx.cmd -ErrorAction SilentlyContinue
 
 if (-not $nodeCmd -or -not $npxCmd) {
     Write-Host "[!] Warning: Node.js / npx was not detected in PATH." -ForegroundColor Yellow
     Write-Host "    Install Node.js 20+ from https://nodejs.org before running Claude MCP." -ForegroundColor Yellow
+    Write-Host ""
 }
 
+# --- Interactive Prompts ---
 $rawGistInput = Read-Host "Enter Gist Raw URL (e.g. https://gist.githubusercontent.com/.../raw/topo_tunnel.txt)"
-$sshUser      = Read-Host "Enter SSH target user [default: ubuntu]"
-if ([string]::IsNullOrWhiteSpace($sshUser)) { $sshUser = "ubuntu" }
+$sshUser      = Read-Host "Enter SSH target user [default: user]"
+if ([string]::IsNullOrWhiteSpace($sshUser)) { $sshUser = "user" }
 $hostAlias    = Read-Host "Enter SSH Host alias [default: topo-server]"
 if ([string]::IsNullOrWhiteSpace($hostAlias)) { $hostAlias = "topo-server" }
 
@@ -34,11 +37,11 @@ if ([string]::IsNullOrWhiteSpace($rawGistInput)) {
     exit 1
 }
 
-# Clean out commit hashes if user copied a specific commit raw URL
-# Transform https://gist.githubusercontent.com/user/id/raw/<hash>/file -> .../raw/file
+# Clean out commit hash if user copied a specific commit raw URL
+# e.g. .../raw/<40-char-hash>/file -> .../raw/file
 $cleanedGistUrl = $rawGistInput -replace 'raw/[0-9a-fA-F]{40}/', 'raw/'
 
-# Target script install directory
+# --- Install sync script ---
 $targetDir = Join-Path $env:USERPROFILE ".claude-remote-ssh"
 if (-not (Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
@@ -46,7 +49,6 @@ if (-not (Test-Path $targetDir)) {
 
 $targetScript = Join-Path $targetDir "update-tunnel.ps1"
 
-# Read source template script and substitute parameters safely
 $templatePath = Join-Path $PSScriptRoot "update-tunnel.ps1"
 if (-not (Test-Path $templatePath)) {
     Write-Host "[x] Template script not found: $templatePath" -ForegroundColor Red
@@ -61,11 +63,11 @@ $scriptBody = $scriptBody -replace '\{\{HOST_ALIAS\}\}', $hostAlias
 [System.IO.File]::WriteAllText($targetScript, $scriptBody, [System.Text.UTF8Encoding]::new($false))
 Write-Host "[+] Installed sync script to: $targetScript" -ForegroundColor Green
 
-# Perform an initial sync check
+# --- Initial sync test ---
 Write-Host "[i] Performing initial endpoint resolution..." -ForegroundColor Cyan
 powershell.exe -ExecutionPolicy Bypass -NonInteractive -NoProfile -File $targetScript
 
-# Configure Task Scheduler
+# --- Register Scheduled Task ---
 $taskName = "UpdateTunnel_${hostAlias}"
 Write-Host "[+] Registering Windows Scheduled Task: $taskName..." -ForegroundColor Green
 
@@ -83,7 +85,7 @@ Register-ScheduledTask -TaskName $taskName `
     -Action $action -Trigger $trigger -Settings $settings `
     -Description "Automated background sync of SSH endpoint for $hostAlias" -Force | Out-Null
 
-# Setup Claude Desktop MCP Configuration Safely (Merging without overwrite)
+# --- Configure Claude Desktop MCP (PS 5.1 + 7 compatible) ---
 Write-Host "[+] Registering MCP tool in Claude Desktop configuration..." -ForegroundColor Green
 
 $candidatePaths = @(
@@ -97,33 +99,49 @@ foreach ($configPath in $candidatePaths) {
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
     }
 
-    $configObj = [ordered]@{}
+    # Read existing config if present (graceful fallback on invalid JSON)
+    $configObj = $null
     if (Test-Path $configPath) {
         try {
             $existingRaw = Get-Content $configPath -Raw
             if (-not [string]::IsNullOrWhiteSpace($existingRaw)) {
-                $configObj = $existingRaw | ConvertFrom-Json -AsHashtable
+                $configObj = $existingRaw | ConvertFrom-Json
             }
         } catch {
             Write-Host "[!] Warning: Existing config at $configPath was invalid JSON. Starting fresh." -ForegroundColor Yellow
-            $configObj = [ordered]@{}
+            $configObj = $null
         }
     }
 
-    if (-not $configObj.ContainsKey("mcpServers")) {
-        $configObj["mcpServers"] = [ordered]@{}
+    if ($null -eq $configObj) {
+        $configObj = [PSCustomObject]@{}
     }
 
-    $configObj["mcpServers"]["mcp-ssh"] = [ordered]@{
-        "command" = "npx.cmd"
-        "args"    = @("-y", "@aiondadotcom/mcp-ssh")
+    # Ensure mcpServers exists
+    if (-not $configObj.PSObject.Properties['mcpServers']) {
+        $configObj | Add-Member -MemberType NoteProperty -Name 'mcpServers' -Value ([PSCustomObject]@{})
     }
 
+    # Build the mcp-ssh server entry
+    $sshServerEntry = [PSCustomObject]@{
+        command = "npx.cmd"
+        args    = @("-y", "@aiondadotcom/mcp-ssh")
+    }
+
+    # Add or overwrite mcp-ssh entry
+    if ($configObj.mcpServers.PSObject.Properties['mcp-ssh']) {
+        $configObj.mcpServers.'mcp-ssh' = $sshServerEntry
+    } else {
+        $configObj.mcpServers | Add-Member -MemberType NoteProperty -Name 'mcp-ssh' -Value $sshServerEntry
+    }
+
+    # Serialize and write (UTF-8 without BOM)
     $updatedJson = $configObj | ConvertTo-Json -Depth 10
     [System.IO.File]::WriteAllText($configPath, $updatedJson, [System.Text.UTF8Encoding]::new($false))
     Write-Host "    Configured: $configPath" -ForegroundColor Green
 }
 
+# --- Done ---
 Write-Host ""
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host "  Desktop Setup Complete!" -ForegroundColor Green
